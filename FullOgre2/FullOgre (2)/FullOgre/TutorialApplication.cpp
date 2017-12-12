@@ -40,7 +40,10 @@ TutorialApplication::TutorialApplication(void) :
 	mSceneNumber(0),
 	 mInfoLabel(0),
 	 mTrayMgr(0),
+	 angle(0),
+	 HP(20),
 	fireParticle(0)
+
 {
 	for(int i=0;i<10;i++)
 	{
@@ -84,7 +87,6 @@ void TutorialApplication::chooseSceneManager(void)
 
 	    mOverlaySystem = new Ogre::OverlaySystem();
 		mSceneMgr->addRenderQueueListener(mOverlaySystem);
-		mSceneMgr->removeRenderQueueListener(mOverlaySystem);
 		mMainSceneMgr->addRenderQueueListener(mOverlaySystem);
 		
 }
@@ -137,15 +139,14 @@ void TutorialApplication::createFrameListener(void)
 	    mTrayMgr = new OgreBites::SdkTrayManager("InterfaceName", mWindow, mInputContext, this);
 		mTrayMgr->showFrameStats(OgreBites::TL_BOTTOMLEFT);
 		mTrayMgr->showLogo(OgreBites::TL_BOTTOMRIGHT);
-		mTrayMgr->hideCursor();
+	    mTrayMgr->showCursor();
 
 		mInfoLabel = mTrayMgr->createLabel( OgreBites::TL_TOP, // Label location 
 		"TerrainInfo", // Label name 
 		"Press Space to start.", // Label caption 
 		350); // Label width
-	mRoot->addFrameListener(this);
-	
 
+	mRoot->addFrameListener(this);
 }
 
 void TutorialApplication::createViewports(void)
@@ -254,15 +255,24 @@ bool TutorialApplication::frameRenderingQueued(const Ogre::FrameEvent& fe)
 
 	if(mSceneNumber==1)
 	{
-		time += fe.timeSinceLastFrame;
 
-		if(time>=7)
+		if(HP<10)
 		{
 			if(!(fireParticle->isAttached()))
 			{
 				fireParticleNode = mSceneMgr->getRootSceneNode()->createChildSceneNode("Fireworks");
 				fireParticleNode->attachObject(fireParticle);
 			}
+			time += fe.timeSinceLastFrame;
+			if(time>=3)
+			{
+				HP--;
+				std::string a = "HP :" + Ogre::StringConverter::toString(  HP);
+				mInfoLabel->setCaption(a);
+				time=0;
+			}
+
+
 		}
 
 		gunNode->translate(mPlayerDirection * fe.timeSinceLastFrame,Node::TS_LOCAL);
@@ -277,15 +287,24 @@ bool TutorialApplication::frameRenderingQueued(const Ogre::FrameEvent& fe)
 			}
 		}
 
+
 		lightrotation(fe);
 		robotAniControl(fe);
+
+		if(HP<=0)
+		{
+			//PlaySound(NULL, 0, 0);
+			//PlaySound(TEXT(MUSIC3),NULL,SND_FILENAME | SND_ASYNC | SND_LOOP);
+			setupViewport(mEndSceneMgr);
+		}
+
 	}
 	return true;
 }
 
 bool TutorialApplication::keyPressed(const OIS::KeyEvent& ke)
 {
-	std::string a = Ogre::StringConverter::toString(mCamera->getPosition());
+	std::string a = Ogre::StringConverter::toString(mTrayMgr->getCursorContainer()->getTop());
 	switch (ke.key)
 	{
 	case OIS::KC_W:
@@ -308,16 +327,13 @@ bool TutorialApplication::keyPressed(const OIS::KeyEvent& ke)
 		mSceneNumber++;
 		if(mSceneNumber==1)
 		{
-			PlaySound(NULL, 0, 0);
-			PlaySound(TEXT(MUSIC),NULL,SND_FILENAME | SND_ASYNC | SND_LOOP);
+			//PlaySound(NULL, 0, 0);
+			//PlaySound(TEXT(MUSIC),NULL,SND_FILENAME | SND_ASYNC | SND_LOOP);
 			setupViewport(mSceneMgr);
 
-		}
-		else if(mSceneNumber==2)
-		{
-			PlaySound(NULL, 0, 0);
-			PlaySound(TEXT(MUSIC3),NULL,SND_FILENAME | SND_ASYNC | SND_LOOP);
-			setupViewport(mEndSceneMgr);
+			std::string a = "HP : " + Ogre::StringConverter::toString(HP);
+			mInfoLabel->setCaption(a);
+
 		}
 		break;
 	case OIS::KC_V:
@@ -356,20 +372,38 @@ bool TutorialApplication::mouseMoved(const OIS::MouseEvent& me)
     mCameraMan->injectMouseMove(me);
 	if(mSceneNumber==1)
 	{
-	gunNode->yaw(Ogre::Degree(-me.state.X.rel *0.15));
+	
 	//aimNode->setPosition(aimNode->getPosition().x + (cos(-me.state.X.rel)), aimNode->getPosition().y, aimNode->getPosition().z+sin(-me.state.X.rel));
-	gunNode->pitch(Ogre::Degree(-me.state.Y.rel * 0.25));
+	angle += -me.state.X.rel *0.15;
+	gunNode->yaw(Ogre::Degree(-me.state.X.rel *0.15));
+
+	 mMouseX = (Real)me.state.X.abs / (Real)me.state.width;
+    mMouseY = (Real)me.state.Y.abs / (Real)me.state.height;
+
+	mTrayMgr->getCursorContainer()->setPosition(mWindow->getWidth()/2 - mMouseX-0.042f, mWindow->getHeight()/2 - mMouseY+0.004f);
 	}
 	return true;
 }
 
+
 bool TutorialApplication::mousePressed(const OIS::MouseEvent& me, OIS::MouseButtonID id)
 {
+	Ray ray = mTrayMgr->getCursorRay(mCamera);
+	for(int i=0;i<4;i++)
+	{
+		std::pair<bool,Real> a = ray.intersects(robotNode[i]->_getWorldAABB());
+		if(a.first)
+		{
+			robotNode[i]->detachObject(robotEntity[i]);
+			mSceneMgr->destroySceneNode(robotNode[i]);
+		}
+	}
 	return true;
 }
 
 bool TutorialApplication::mouseReleased(const OIS::MouseEvent& me, OIS::MouseButtonID id)
 {
+	//MessageBox(NULL,a.c_str(), "An exception has occurred!", MB_OK | MB_ICONERROR | MB_TASKMODAL);
 	return true;
 }
 void TutorialApplication::createScene(void)
@@ -383,7 +417,7 @@ ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, plane,
 4000,4000,200,200,true,1,5,5,Vector3::UNIT_Z);
 
 
-Ogre::Entity* ent = mSceneMgr->createEntity("LightPlaneEntity", "plane");
+ ent = mSceneMgr->createEntity("LightPlaneEntity", "plane");
 mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(ent);
 ent->setMaterialName("Examples/BeachStones");
 planeNode = mSceneMgr->createSceneNode("PlaneNode");
@@ -391,17 +425,18 @@ mSceneMgr->getRootSceneNode()->addChild(planeNode);
 
 Ogre::Entity* tudorEntity = mSceneMgr->createEntity("tudorhouse.mesh");
 tudorNode = mSceneMgr->getRootSceneNode()->createChildSceneNode( "TudorNode"); 
-tudorNode->setPosition(0,700,0);
+tudorNode->setPosition(0,600,0);
+tudorNode->showBoundingBox(true);
 tudorEntity->setCastShadows(false);
+box[4] = tudorEntity->getBoundingBox();
 tudorNode->attachObject(tudorEntity);
 
 Ogre::Entity* gunNodeEntity = mSceneMgr->createEntity("machine_gun.mesh");
 gunNodeEntity->setCastShadows(true);
 gunNode = mSceneMgr->getRootSceneNode() ->createChildSceneNode("gunNode"); 
 gunNode->setScale(1500, 1500, 1500);
-gunNode->yaw(Degree(180));
-gunNode->pitch(Degree(-20));
-gunNode->setPosition(140,1908,-3200);
+gunNode->yaw(Degree(180));;
+gunNode->setPosition(0,0,1500);
 gunNode->attachObject(gunNodeEntity);
 
 
@@ -438,8 +473,12 @@ mSceneMgr->setShadowTechnique(SHADOWTYPE_STENCIL_ADDITIVE);
 
 mMainSceneMgr->setSkyBox(true,"Examples/SpaceSkyBox"); 
 mEndSceneMgr->setSkyBox(true,"Examples/EarlyMorningSkyBox");
-PlaySound(TEXT(MUSIC2),NULL,SND_FILENAME | SND_ASYNC | SND_LOOP);
+//PlaySound(TEXT(MUSIC2),NULL,SND_FILENAME | SND_ASYNC | SND_LOOP);
 fireParticle = mSceneMgr->createParticleSystem("Examples2","Examples/GreenyNimbus");
+
+sphereEnt = mSceneMgr->createEntity("MySphere", Ogre::SceneManager::PT_SPHERE); 
+sphereEnt->setMaterialName("BaseWhiteLighting"); 
+sphereNode = mSceneMgr->getRootSceneNode()->createChildSceneNode();
 
 return;
 
@@ -455,11 +494,13 @@ void TutorialApplication::createEnemy()
 	//robotEntity[0] = mSceneMgr->createEntity("Robot", "robot.mesh");
 	robotNode[0] = mSceneMgr->getRootSceneNode() ->createChildSceneNode("RobotNode"); 
 	robotNode[0]->setScale(3,3,3);
-	robotNode[0]->setPosition(1500,0,1550);
 	robotNode[0]->lookAt(planeNode->getPosition(),Node::TS_WORLD,Vector3::UNIT_X);
 	robotEntity[0]->setCastShadows(true);
+	robotNode[0]->showBoundingBox(true); 
+	box[0] = robotEntity[0]->getBoundingBox(); 
+	robotNode[0]->setPosition(1500,-box[0].getCorner(AxisAlignedBox::FAR_LEFT_TOP).y,1550);
 	robotNode[0]->attachObject(robotEntity[0]);
-
+	
 
 	//robotEntity[1] = mSceneMgr->createEntity("Robot1", "robot.mesh");
 	robotNode[1] = mSceneMgr->getRootSceneNode() ->createChildSceneNode("RobotNode2"); 
@@ -467,6 +508,8 @@ void TutorialApplication::createEnemy()
 	robotNode[1]->setPosition(1700,0,-1400);
 	robotNode[1]->lookAt(planeNode->getPosition(),Node::TS_WORLD,Vector3::UNIT_X);
 	robotEntity[1]->setCastShadows(true);
+	robotNode[1]->showBoundingBox(true); 
+	box[1] = robotEntity[1]->getBoundingBox();
 	robotNode[1]->attachObject(robotEntity[1]);
 	
 
@@ -476,6 +519,8 @@ void TutorialApplication::createEnemy()
 	robotNode[2]->setPosition(-1180,0,-1750);
 	robotNode[2]->lookAt(planeNode->getPosition(),Node::TS_WORLD,Vector3::UNIT_X);
 	robotEntity[2]->setCastShadows(true);
+	robotNode[2]->showBoundingBox(true); 
+	box[2] = robotEntity[2]->getBoundingBox();
 	robotNode[2]->attachObject(robotEntity[2]);
 
 	//robotEntity[3] = mSceneMgr->createEntity("Robot3", "robot.mesh");
@@ -484,9 +529,9 @@ void TutorialApplication::createEnemy()
 	robotNode[3]->setPosition(-1500,0,1180);
 	robotNode[3]->lookAt(planeNode->getPosition(),Node::TS_WORLD,Vector3::UNIT_X);
 	robotEntity[3]->setCastShadows(true);
+	robotNode[3]->showBoundingBox(true); 
+	box[3] = robotEntity[3]->getBoundingBox();
 	robotNode[3]->attachObject(robotEntity[3]);
-
-
 }
 void TutorialApplication::createLight(Ogre::SceneNode* planeNode)
 {
@@ -646,6 +691,9 @@ void TutorialApplication::robotMove(int index,const Ogre::FrameEvent& fe)
 				{
 					if(robotstate[index] == shoot)
 					{
+						HP--;
+						std::string a = "HP :" + Ogre::StringConverter::toString( HP);
+						mInfoLabel->setCaption(a);
 						robotstate[index] = idle;
 					}
 					else if(robotstate[index] == idle ||robotstate[index] == walk )
@@ -655,9 +703,6 @@ void TutorialApplication::robotMove(int index,const Ogre::FrameEvent& fe)
 					}
 				}
 			}
-
-
-	
 		}
 }
 
@@ -684,6 +729,8 @@ void TutorialApplication::robotAniControl(const Ogre::FrameEvent& fe)
 				RorotAni[i] = robotEntity[i]->getAnimationState("Shoot");
 				RorotAni[i]->setLoop(true);
 				RorotAni[i]->setEnabled(true);
+
+
 			}
 			if(robotstate[i] == die)
 			{
@@ -743,6 +790,8 @@ void TutorialApplication::setupViewport(Ogre::SceneManager *curr)
 	cam->setAspectRatio(Ogre::Real(vp->getActualWidth()) / Ogre::Real(vp->getActualHeight()));*/
 
 }
+
+
 
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_WIN32 

@@ -9,7 +9,7 @@
 #include <SdkCameraMan.h>
 #include <SdkTrays.h>
 #include <OgreAnimationState.h>
-
+#include <OgreSceneQuery.h>
 
 enum RobotState
 {
@@ -31,8 +31,7 @@ private:
 	Ogre::SceneManager* mMainSceneMgr;
 	Ogre::SceneManager* mEndSceneMgr;
 	int mSceneNumber;
-
-	
+	Ogre::AxisAlignedBox box[10];
 
 	Ogre::SceneNode* mCamNode;
 	Ogre::SceneNode *robotNode[10];
@@ -41,10 +40,13 @@ private:
 	Ogre::SceneNode* fireParticleNode;
 	Ogre::SceneNode* planeNode;
 	Ogre::SceneNode* gunNode;
+	Ogre::SceneNode *sphereNode;
 	Ogre::Camera* mCamera;
 	OgreBites::SdkCameraMan*    mCameraMan;
 
 	Ogre::Entity* robotEntity[10];
+	Ogre::Entity* ent;
+	Ogre::Entity* sphereEnt;
 
 	OIS::InputManager* mInputMgr; 
 	OIS::Mouse* mMouse; 
@@ -57,6 +59,7 @@ private:
 
 	Ogre::Real mPlayerMove; 
 	Ogre::Real mRobotMove;
+	Ogre::Real angle;
 
 	Ogre::ParticleSystem* snowParticle;
 	Ogre::ParticleSystem* fireParticle;
@@ -85,9 +88,16 @@ private:
 
 	virtual void setupViewport(Ogre::SceneManager *curr); 
 
+	Ogre::Real mMouseX;
+    Ogre::Real mMouseY;
+
 	OgreBites::Label* mInfoLabel;
+	OgreBites::Label* mInfoLabel2;
+
 	OgreBites::SdkTrayManager*	mTrayMgr;
 	OgreBites::InputContext   mInputContext;
+
+	int HP;
 protected:
 	virtual bool configure(void);
 	virtual void chooseSceneManager(void);
